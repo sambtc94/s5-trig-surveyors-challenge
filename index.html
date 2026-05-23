@@ -11,29 +11,40 @@
       --red: #dc2626;
       --bg: #f0f9ff;
       --card: #ffffff;
+      --ink: #0f172a;
+      --muted: #475569;
     }
 
     body {
-      font-family: Arial, sans-serif;
-      background: linear-gradient(180deg, #e0f2fe 0%, #f8fafc 100%);
+      font-family: "Inter", "Segoe UI", Arial, sans-serif;
+      background: radial-gradient(circle at top, #dbeafe 0%, #eff6ff 30%, #f8fafc 100%);
       margin: 0;
-      padding: 20px;
-      color: #0f172a;
+      padding: 24px;
+      color: var(--ink);
     }
 
     .container {
-      max-width: 760px;
+      max-width: 820px;
       margin: 0 auto;
       background: var(--card);
-      border-radius: 14px;
-      padding: 18px;
-      box-shadow: 0 8px 18px rgba(15, 23, 42, 0.08);
+      border-radius: 18px;
+      padding: 22px;
+      border: 1px solid #dbeafe;
+      box-shadow: 0 20px 40px rgba(15, 23, 42, 0.1);
     }
 
     h1 {
       text-align: center;
-      margin: 0 0 12px;
-      color: #0c4a6e;
+      margin: 0 0 14px;
+      color: #0f3e67;
+      letter-spacing: 0.2px;
+    }
+
+    .question-prompt {
+      text-align: center;
+      margin-bottom: 12px;
+      color: var(--muted);
+      font-weight: 600;
     }
 
     canvas {
@@ -42,9 +53,9 @@
       height: 350px;
       max-width: 100%;
       margin: 0 auto 12px;
-      border: 3px solid #0ea5e9;
-      border-radius: 10px;
-      background: var(--bg);
+      border: 3px solid #60a5fa;
+      border-radius: 14px;
+      background: linear-gradient(180deg, #e0f2fe 0%, #f0f9ff 60%, #e2e8f0 100%);
     }
 
     .badge-row,
@@ -69,6 +80,16 @@
       margin: 8px 0 10px;
     }
 
+    .progress-meta {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 6px;
+      color: var(--muted);
+      font-weight: 600;
+      font-size: 0.92rem;
+    }
+
     .progress-track {
       height: 12px;
       background: #cbd5e1;
@@ -87,7 +108,7 @@
     .scaffold,
     .feedback {
       background: #f8fafc;
-      border: 1px solid #e2e8f0;
+      border: 1px solid #dbe3ef;
       border-radius: 10px;
       padding: 10px;
       margin-bottom: 10px;
@@ -138,8 +159,19 @@
       cursor: pointer;
       border: none;
       font-weight: 700;
-      background: #2563eb;
+      background: linear-gradient(180deg, #3b82f6 0%, #2563eb 100%);
       color: #fff;
+      transition: transform 0.08s ease, box-shadow 0.15s ease;
+    }
+
+    button:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 8px 16px rgba(37, 99, 235, 0.22);
+    }
+
+    button:active {
+      transform: translateY(0);
+      box-shadow: none;
     }
 
     .secondary {
@@ -170,11 +202,17 @@
       gap: 8px;
       flex-wrap: wrap;
     }
+
+    #hintBtn,
+    [data-role="hint"] {
+      display: none !important;
+    }
   </style>
 </head>
 <body>
   <div class="container">
     <h1>Surveyor's Challenge</h1>
+    <div id="questionPrompt" class="question-prompt"></div>
     <canvas id="sceneCanvas" width="600" height="350"></canvas>
 
     <div class="badge-row">
@@ -187,10 +225,14 @@
       <span class="badge" id="questionsBadge"></span>
       <span class="badge" id="firstTryBadge"></span>
       <span class="badge" id="streakBadge"></span>
+      <span class="badge" id="pointsBadge"></span>
     </div>
 
     <div class="progress-wrap">
-      <strong>Progress</strong>
+      <div class="progress-meta">
+        <strong>Progress</strong>
+        <span id="progressText"></span>
+      </div>
       <div class="progress-track">
         <div id="progressFill" class="progress-fill"></div>
       </div>
@@ -232,7 +274,10 @@
     const questionsBadge = document.getElementById('questionsBadge');
     const firstTryBadge = document.getElementById('firstTryBadge');
     const streakBadge = document.getElementById('streakBadge');
+    const pointsBadge = document.getElementById('pointsBadge');
+    const questionPrompt = document.getElementById('questionPrompt');
     const progressFill = document.getElementById('progressFill');
+    const progressText = document.getElementById('progressText');
     const knownValues = document.getElementById('knownValues');
     const scaffoldArea = document.getElementById('scaffoldArea');
     const ratioButtons = document.getElementById('ratioButtons');
@@ -252,6 +297,7 @@
       questionsAnswered: 0,
       correctFirstAttempt: 0,
       currentStreak: 0,
+      points: 0,
       nextQuestionIndex: randInt(0, questionTypes.length - 1),
       ratioSelected: null,
       currentQuestion: null
@@ -323,7 +369,7 @@
       } else if (q.type === 'B') {
         step3 = `Solve: d = h / tan(θ) = ${q.h} / tan(${q.theta}°) = ${q.answer} m`;
       } else {
-        step3 = `Solve: θ = atan(h / d) = atan(${q.h} / ${q.d}) = ${q.answer.toFixed(1)}°`;
+        step3 = `Solve: θ = tan^-1(h / d) = tan^-1(${q.h} / ${q.d}) = ${q.answer.toFixed(1)}°`;
       }
 
       return [
@@ -355,9 +401,13 @@
       questionsBadge.textContent = `Questions: ${state.questionsAnswered}`;
       firstTryBadge.textContent = `First Try Correct: ${state.correctFirstAttempt}`;
       streakBadge.textContent = `Streak: ${state.currentStreak}`;
+      pointsBadge.textContent = `Points: ${state.points}`;
 
       const progressUnits = state.level === 4 ? 6 : ((state.level - 1) * 2 + state.levelStreak);
-      progressFill.style.width = `${Math.round((progressUnits / 6) * 100)}%`;
+      const masteryPercent = Math.round((progressUnits / 6) * 100);
+      progressFill.style.width = `${masteryPercent}%`;
+      progressText.textContent = state.level === 4 ? 'Mastery complete' : `Level ${state.level}: ${state.levelStreak}/2`;
+      questionPrompt.textContent = `Use the diagram to ${getTypeLabel(q.type).toLowerCase()} in this ${q.sceneType.toLowerCase()} scene.`;
     }
 
     function drawArc(cx, cy, start, end, radius) {
@@ -403,9 +453,18 @@
       const rightX = 470;
       const groundY = 280;
 
+      const sky = ctx.createLinearGradient(0, 0, 0, groundY);
+      sky.addColorStop(0, '#dbeafe');
+      sky.addColorStop(1, '#f0f9ff');
+      ctx.fillStyle = sky;
+      ctx.fillRect(0, 0, canvas.width, groundY);
+      ctx.fillStyle = '#d1fae5';
+      ctx.fillRect(0, groundY, canvas.width, canvas.height - groundY);
+
       ctx.beginPath();
       ctx.moveTo(20, groundY);
       ctx.lineTo(580, groundY);
+      ctx.strokeStyle = '#14532d';
       ctx.stroke();
 
       if (q.sceneType === 'ELEVATION') {
@@ -600,6 +659,7 @@
       q.attempts += 1;
 
       if (correct) {
+        state.points += q.attempts === 1 ? 10 : 5;
         state.currentStreak += 1;
         state.levelStreak += 1;
         let levelMessage = '';
@@ -610,6 +670,7 @@
         }
         showFeedback(true, levelMessage);
       } else {
+        state.points = Math.max(0, state.points - 2);
         state.currentStreak = 0;
         state.levelStreak = 0;
         showFeedback(false);
