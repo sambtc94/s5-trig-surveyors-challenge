@@ -104,8 +104,6 @@
       transition: width 0.2s ease;
     }
 
-    .known-values,
-    .scaffold,
     .feedback {
       background: #f8fafc;
       border: 1px solid #dbe3ef;
@@ -114,41 +112,10 @@
       margin-bottom: 10px;
     }
 
-    .known-values {
-      display: none;
-    }
-
-    .known-values strong,
-    .scaffold strong {
-      color: #1e40af;
-    }
-
     .controls {
       display: grid;
       gap: 8px;
       margin-bottom: 10px;
-    }
-
-    .ratio-buttons {
-      display: none;
-      gap: 8px;
-      margin-bottom: 6px;
-      flex-wrap: wrap;
-    }
-
-    .ratio-btn {
-      border: 2px solid #2563eb;
-      color: #1e3a8a;
-      background: white;
-      border-radius: 8px;
-      padding: 6px 12px;
-      cursor: pointer;
-      font-weight: 700;
-    }
-
-    .ratio-btn.active {
-      background: #2563eb;
-      color: #fff;
     }
 
     input,
@@ -222,7 +189,7 @@
     <div class="badge-row">
       <span id="questionTypeBadge" class="badge"></span>
       <span id="sceneTypeBadge" class="badge"></span>
-      <span id="levelBadge" class="badge"></span>
+      <span id="ratioBadge" class="badge"></span>
     </div>
 
     <div class="stats-row">
@@ -232,26 +199,7 @@
       <span class="badge" id="pointsBadge"></span>
     </div>
 
-    <div class="progress-wrap">
-      <div class="progress-meta">
-        <strong>Progress</strong>
-        <span id="progressText"></span>
-      </div>
-      <div class="progress-track">
-        <div id="progressFill" class="progress-fill"></div>
-      </div>
-    </div>
-
-    <div id="knownValues" class="known-values"></div>
-    <div id="scaffoldArea" class="scaffold"></div>
-
     <div class="controls">
-      <div id="ratioButtons" class="ratio-buttons">
-        <button class="ratio-btn" data-ratio="sin" type="button">sin</button>
-        <button class="ratio-btn" data-ratio="cos" type="button">cos</button>
-        <button class="ratio-btn" data-ratio="tan" type="button">tan</button>
-      </div>
-      <input id="equationInput" type="text" placeholder="Write your equation here (Guided level)" style="display:none;" />
       <input id="answerInput" type="number" step="0.1" placeholder="Type your answer" />
       <button id="checkBtn" type="button">Check Answer</button>
     </div>
@@ -274,18 +222,12 @@
 
     const questionTypeBadge = document.getElementById('questionTypeBadge');
     const sceneTypeBadge = document.getElementById('sceneTypeBadge');
-    const levelBadge = document.getElementById('levelBadge');
+    const ratioBadge = document.getElementById('ratioBadge');
     const questionsBadge = document.getElementById('questionsBadge');
     const firstTryBadge = document.getElementById('firstTryBadge');
     const streakBadge = document.getElementById('streakBadge');
     const pointsBadge = document.getElementById('pointsBadge');
     const questionPrompt = document.getElementById('questionPrompt');
-    const progressFill = document.getElementById('progressFill');
-    const progressText = document.getElementById('progressText');
-    const knownValues = document.getElementById('knownValues');
-    const scaffoldArea = document.getElementById('scaffoldArea');
-    const ratioButtons = document.getElementById('ratioButtons');
-    const equationInput = document.getElementById('equationInput');
     const answerInput = document.getElementById('answerInput');
     const checkBtn = document.getElementById('checkBtn');
     const feedback = document.getElementById('feedback');
@@ -293,17 +235,30 @@
     const tryAgainBtn = document.getElementById('tryAgainBtn');
     const depressionNote = document.getElementById('depressionNote');
 
-    const questionTypes = ['A', 'B', 'C'];
+    const questionTypes = [
+      'HEIGHT_FROM_ADJ_ANGLE',
+      'DIST_FROM_OPP_ANGLE',
+      'ANGLE_FROM_SIDES',
+      'HYP_FROM_OPP_ANGLE',
+      'HYP_FROM_ADJ_ANGLE',
+      'HEIGHT_FROM_HYP_ANGLE',
+      'DIST_FROM_HYP_ANGLE'
+    ];
+
+    const triples = [
+      [3, 4, 5],
+      [5, 12, 13],
+      [8, 15, 17],
+      [7, 24, 25],
+      [9, 40, 41]
+    ];
 
     const state = {
-      level: 1,
-      levelStreak: 0,
       questionsAnswered: 0,
       correctFirstAttempt: 0,
       currentStreak: 0,
       points: 0,
       nextQuestionIndex: randInt(0, questionTypes.length - 1),
-      ratioSelected: null,
       currentQuestion: null
     };
 
@@ -323,110 +278,125 @@
 
     function createQuestion() {
       const sceneType = Math.random() < 0.5 ? 'ELEVATION' : 'DEPRESSION';
-      const d = randInt(20, 90);
-      const theta = randInt(25, 65);
-      const h = Math.round(d * Math.tan(theta * Math.PI / 180));
       const type = nextQuestionType();
+      const [a, b, c] = triples[randInt(0, triples.length - 1)];
+      const scale = randInt(4, 10);
+      const swapLegs = Math.random() < 0.5;
+      const adjacent = (swapLegs ? b : a) * scale;
+      const opposite = (swapLegs ? a : b) * scale;
+      const hypotenuse = c * scale;
+      const theta = roundTo1dp(Math.atan(opposite / adjacent) * 180 / Math.PI);
 
       let answer;
-      if (type === 'A') {
-        answer = h;
-      } else if (type === 'B') {
-        answer = Math.round(h / Math.tan(theta * Math.PI / 180));
+      let unknown;
+      let ratio;
+      let solveText = '';
+      let prompt = '';
+
+      if (type === 'HEIGHT_FROM_ADJ_ANGLE') {
+        answer = opposite;
+        unknown = 'opposite';
+        ratio = 'tan';
+        solveText = `${adjacent} × tan(${theta}°) = ${answer} m`;
+        prompt = sceneType === 'ELEVATION'
+          ? `A surveyor is ${adjacent} m from a tower and measures an angle of elevation of ${theta}°. Find the tower height.`
+          : `From a lookout point, a surveyor measures an angle of depression of ${theta}° to a target. The horizontal distance is ${adjacent} m. Find the vertical drop.`;
+      } else if (type === 'DIST_FROM_OPP_ANGLE') {
+        answer = adjacent;
+        unknown = 'adjacent';
+        ratio = 'tan';
+        solveText = `${opposite} ÷ tan(${theta}°) = ${answer} m`;
+        prompt = sceneType === 'ELEVATION'
+          ? `A surveyor measures an angle of elevation of ${theta}° to the top of a structure. The structure is ${opposite} m high. How far is the surveyor from the base?`
+          : `A lookout station is ${opposite} m above sea level. A boat is seen at an angle of depression of ${theta}°. How far is the boat horizontally from the station?`;
+      } else if (type === 'ANGLE_FROM_SIDES') {
+        answer = theta;
+        unknown = 'angle';
+        ratio = 'tan';
+        solveText = `tan⁻¹(${opposite} ÷ ${adjacent}) = ${answer.toFixed(1)}°`;
+        prompt = sceneType === 'ELEVATION'
+          ? `A surveyor is ${adjacent} m from a building and the top is ${opposite} m above eye level. Find the angle of elevation.`
+          : `From a cliff lookout, the target is ${adjacent} m away horizontally and ${opposite} m below. Find the angle of depression.`;
+      } else if (type === 'HYP_FROM_OPP_ANGLE') {
+        answer = hypotenuse;
+        unknown = 'hypotenuse';
+        ratio = 'sin';
+        solveText = `${opposite} ÷ sin(${theta}°) = ${answer} m`;
+        prompt = sceneType === 'ELEVATION'
+          ? `A surveyor measures an angle of elevation of ${theta}° and knows the height difference is ${opposite} m. Find the line-of-sight distance.`
+          : `A lookout measures an angle of depression of ${theta}° to a point ${opposite} m below. Find the line-of-sight distance.`;
+      } else if (type === 'HYP_FROM_ADJ_ANGLE') {
+        answer = hypotenuse;
+        unknown = 'hypotenuse';
+        ratio = 'cos';
+        solveText = `${adjacent} ÷ cos(${theta}°) = ${answer} m`;
+        prompt = sceneType === 'ELEVATION'
+          ? `A surveyor stands ${adjacent} m from a tower and measures an angle of elevation of ${theta}°. Find the line-of-sight distance to the top.`
+          : `A lookout sees a target at an angle of depression of ${theta}° with a horizontal distance of ${adjacent} m. Find the line-of-sight distance.`;
+      } else if (type === 'HEIGHT_FROM_HYP_ANGLE') {
+        answer = opposite;
+        unknown = 'opposite';
+        ratio = 'sin';
+        solveText = `${hypotenuse} × sin(${theta}°) = ${answer} m`;
+        prompt = sceneType === 'ELEVATION'
+          ? `A surveyor measures an angle of elevation of ${theta}° and a line-of-sight distance of ${hypotenuse} m. Find the height difference.`
+          : `A lookout has a line of sight of ${hypotenuse} m to a target at an angle of depression of ${theta}°. Find the vertical drop.`;
       } else {
-        answer = roundTo1dp(Math.atan(h / d) * 180 / Math.PI);
+        answer = adjacent;
+        unknown = 'adjacent';
+        ratio = 'cos';
+        solveText = `${hypotenuse} × cos(${theta}°) = ${answer} m`;
+        prompt = sceneType === 'ELEVATION'
+          ? `A surveyor measures an angle of elevation of ${theta}° and a line-of-sight distance of ${hypotenuse} m. Find the horizontal distance to the base.`
+          : `A lookout has a line-of-sight distance of ${hypotenuse} m to a target at an angle of depression of ${theta}°. Find the horizontal distance.`;
       }
 
       state.currentQuestion = {
         sceneType,
-        d,
+        adjacent,
+        opposite,
+        hypotenuse,
         theta,
-        h,
         type,
+        ratio,
+        unknown,
+        solveText,
+        prompt,
         answer,
         attempts: 0
       };
-      state.ratioSelected = null;
     }
 
     function getTypeLabel(type) {
-      return type === 'A' ? 'Find Height' : type === 'B' ? 'Find Distance' : 'Find Angle';
-    }
-
-    function knownValuesHtml(q) {
-      let html = '<strong>Known values:</strong> ';
-      if (q.type === 'A') {
-        html += `Distance d = ${q.d} m, Angle θ = ${q.theta}°`;
-      } else if (q.type === 'B') {
-        html += `Height h = ${q.h} m, Angle θ = ${q.theta}°`;
-      } else {
-        html += `Height h = ${q.h} m, Distance d = ${q.d} m`;
-      }
-      return html;
+      if (type === 'HEIGHT_FROM_ADJ_ANGLE' || type === 'HEIGHT_FROM_HYP_ANGLE') return 'Find Height';
+      if (type === 'DIST_FROM_OPP_ANGLE' || type === 'DIST_FROM_HYP_ANGLE') return 'Find Distance';
+      if (type === 'ANGLE_FROM_SIDES') return 'Find Angle';
+      return 'Find Line-of-Sight';
     }
 
     function workedSolution(q) {
-      const valueText = q.type === 'C' ? `${q.answer.toFixed(1)}°` : `${q.answer} m`;
-      let step3;
-      if (q.type === 'A') {
-        step3 = `Solve: h = d × tan(θ) = ${q.d} × tan(${q.theta}°) = ${q.answer} m`;
-      } else if (q.type === 'B') {
-        step3 = `Solve: d = h / tan(θ) = ${q.h} / tan(${q.theta}°) = ${q.answer} m`;
-      } else {
-        step3 = `Solve: θ = tan^-1(h / d) = tan^-1(${q.h} / ${q.d}) = ${q.answer.toFixed(1)}°`;
-      }
+      const valueText = q.unknown === 'angle' ? `${q.answer.toFixed(1)}°` : `${q.answer} m`;
 
       return [
-        'Step 1: Which ratio? <strong>tan</strong> — because we have opposite and adjacent.',
-        'Step 2: Set up: <strong>tan(θ) = h / d</strong>',
-        `Step 3: ${step3}`,
+        `Step 1: Use <strong>${q.ratio}</strong> for this relationship.`,
+        `Step 2: Compute: ${q.solveText}`,
         `<strong>Answer: ${valueText}</strong>`
       ].join('<br>');
     }
 
-    function scaffoldHtml(q) {
-      if (state.level === 1) {
-        return '';
-      }
-      if (state.level === 2) {
-        return '<strong>Guided (Level 2)</strong><br>Use <strong>tan</strong> because it connects opposite and adjacent. Write your equation and answer.';
-      }
-      if (state.level === 3) {
-        return '<strong>Setup (Level 3)</strong><br>Equation shell: <strong>tan(θ) = __ / __</strong>. Fill in and solve for the unknown.';
-      }
-      return '';
-    }
-
     function getQuestionPrompt(q) {
-      if (q.type === 'A') {
-        return q.sceneType === 'ELEVATION'
-          ? 'A surveyor looks up to the top of an object. Use the triangle to find the height h (in metres).'
-          : 'A surveyor looks down to a target. Use the triangle to find the vertical height h (in metres).';
-      }
-      if (q.type === 'B') {
-        return q.sceneType === 'ELEVATION'
-          ? 'A surveyor looks up to a top point. Use the triangle to find the horizontal distance d (in metres).'
-          : 'A surveyor looks down to a target. How far is it from the base of the building to the target?';
-      }
-      return q.sceneType === 'ELEVATION'
-        ? 'A surveyor looks up to a top point. Use the triangle to find the angle θ (in degrees).'
-        : 'A surveyor looks down to a target. Use the triangle to find the angle θ (in degrees).';
+      return q.prompt;
     }
 
     function updateBadges() {
       const q = state.currentQuestion;
       questionTypeBadge.textContent = `Question Type: ${getTypeLabel(q.type)}`;
       sceneTypeBadge.textContent = `Scene: ${q.sceneType === 'ELEVATION' ? 'Elevation' : 'Depression'}`;
-      levelBadge.textContent = `Scaffold: Level ${state.level}`;
+      ratioBadge.textContent = `Trig Ratio: ${q.ratio}`;
       questionsBadge.textContent = `Questions: ${state.questionsAnswered}`;
       firstTryBadge.textContent = `First Try Correct: ${state.correctFirstAttempt}`;
       streakBadge.textContent = `Streak: ${state.currentStreak}`;
       pointsBadge.textContent = `Points: ${state.points}`;
-
-      const progressUnits = state.level === 4 ? 6 : ((state.level - 1) * 2 + state.levelStreak);
-      const masteryPercent = Math.round((progressUnits / 6) * 100);
-      progressFill.style.width = `${masteryPercent}%`;
-      progressText.textContent = state.level === 4 ? 'Mastery complete' : `Level ${state.level}: ${state.levelStreak}/2`;
       questionPrompt.textContent = getQuestionPrompt(q);
     }
 
@@ -452,43 +422,78 @@
       ctx.save();
       ctx.translate(footX, footY);
       ctx.scale(facing === 'left' ? -1 : 1, 1);
-      ctx.lineWidth = 2.5;
-      ctx.strokeStyle = '#0f172a';
-      ctx.fillStyle = '#0f172a';
 
+      // ground shadow
+      ctx.fillStyle = 'rgba(15, 23, 42, 0.20)';
       ctx.beginPath();
-      ctx.arc(0, -24 * scale, 6.5 * scale, 0, Math.PI * 2);
-      ctx.stroke();
-
-      ctx.beginPath();
-      ctx.moveTo(0, -17 * scale);
-      ctx.lineTo(0, -7 * scale);
-      ctx.moveTo(0, -15 * scale);
-      ctx.lineTo(-9 * scale, -11 * scale);
-      ctx.moveTo(0, -14 * scale);
-      ctx.lineTo(9 * scale, -13 * scale);
-      ctx.moveTo(0, -7 * scale);
-      ctx.lineTo(-6 * scale, 0);
-      ctx.moveTo(0, -7 * scale);
-      ctx.lineTo(6 * scale, 0);
-      ctx.stroke();
-
-      ctx.fillStyle = '#334155';
-      ctx.fillRect(9 * scale, -17 * scale, 10 * scale, 4 * scale);
-      ctx.beginPath();
-      ctx.moveTo(10 * scale, -13 * scale);
-      ctx.lineTo(16 * scale, -9 * scale);
-      ctx.lineTo(15 * scale, -13 * scale);
-      ctx.closePath();
+      ctx.ellipse(0, 2 * scale, 14 * scale, 4 * scale, 0, 0, Math.PI * 2);
       ctx.fill();
 
-      ctx.strokeStyle = '#475569';
+      // legs and boots
+      ctx.fillStyle = '#1f2937';
+      ctx.fillRect(-8 * scale, -12 * scale, 5 * scale, 12 * scale);
+      ctx.fillRect(3 * scale, -12 * scale, 5 * scale, 12 * scale);
+      ctx.fillStyle = '#0f172a';
+      ctx.fillRect(-10 * scale, -1 * scale, 8 * scale, 3 * scale);
+      ctx.fillRect(2 * scale, -1 * scale, 8 * scale, 3 * scale);
+
+      // torso
+      const jacketGrad = ctx.createLinearGradient(0, -24 * scale, 0, -10 * scale);
+      jacketGrad.addColorStop(0, '#0f4c81');
+      jacketGrad.addColorStop(1, '#1d4ed8');
+      ctx.fillStyle = jacketGrad;
+      ctx.fillRect(-10 * scale, -26 * scale, 20 * scale, 16 * scale);
+
+      // high-vis vest
+      ctx.fillStyle = '#facc15';
+      ctx.fillRect(-3 * scale, -25 * scale, 6 * scale, 14 * scale);
+      ctx.fillStyle = '#f8fafc';
+      ctx.fillRect(-3 * scale, -20 * scale, 6 * scale, 1.8 * scale);
+
+      // arms
+      ctx.fillStyle = '#1d4ed8';
+      ctx.fillRect(-16 * scale, -24 * scale, 7 * scale, 4 * scale);
+      ctx.fillRect(9 * scale, -23 * scale, 8 * scale, 4 * scale);
+
+      // head and helmet
+      ctx.fillStyle = '#f1c27d';
       ctx.beginPath();
-      ctx.moveTo(16 * scale, -9 * scale);
-      ctx.lineTo(14 * scale, -2 * scale);
-      ctx.lineTo(18 * scale, -2 * scale);
-      ctx.closePath();
+      ctx.arc(0, -32 * scale, 6.5 * scale, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#fbbf24';
+      ctx.beginPath();
+      ctx.arc(0, -35 * scale, 7.2 * scale, Math.PI, Math.PI * 2);
+      ctx.fill();
+      ctx.fillRect(-7 * scale, -35 * scale, 14 * scale, 2.2 * scale);
+
+      // face detail
+      ctx.fillStyle = '#0f172a';
+      ctx.beginPath();
+      ctx.arc(-2 * scale, -32 * scale, 0.8 * scale, 0, Math.PI * 2);
+      ctx.arc(2 * scale, -32 * scale, 0.8 * scale, 0, Math.PI * 2);
+      ctx.fill();
+
+      // tripod and scope
+      ctx.strokeStyle = '#64748b';
+      ctx.lineWidth = 1.6 * scale;
+      ctx.beginPath();
+      ctx.moveTo(16 * scale, -18 * scale);
+      ctx.lineTo(14 * scale, 0);
+      ctx.moveTo(16 * scale, -18 * scale);
+      ctx.lineTo(19 * scale, 0);
+      ctx.moveTo(16 * scale, -18 * scale);
+      ctx.lineTo(12 * scale, 0);
       ctx.stroke();
+
+      const scopeGrad = ctx.createLinearGradient(9 * scale, -24 * scale, 20 * scale, -20 * scale);
+      scopeGrad.addColorStop(0, '#334155');
+      scopeGrad.addColorStop(1, '#0f172a');
+      ctx.fillStyle = scopeGrad;
+      ctx.fillRect(8 * scale, -24 * scale, 12 * scale, 4.5 * scale);
+
+      ctx.strokeStyle = '#0b1220';
+      ctx.lineWidth = 1.2 * scale;
+      ctx.strokeRect(8.4 * scale, -23.6 * scale, 11.2 * scale, 3.7 * scale);
       ctx.restore();
     }
 
@@ -496,39 +501,70 @@
       ctx.save();
       ctx.translate(x, y);
 
-      ctx.fillStyle = '#0ea5e9';
+      // buoy base and shadow
+      ctx.fillStyle = 'rgba(15, 23, 42, 0.18)';
       ctx.beginPath();
-      ctx.ellipse(0, 6, 28 * scale, 10 * scale, 0, 0, Math.PI * 2);
+      ctx.ellipse(0, 8 * scale, 22 * scale, 6 * scale, 0, 0, Math.PI * 2);
       ctx.fill();
 
-      ctx.fillStyle = '#0284c7';
+      const floatGrad = ctx.createLinearGradient(0, -6 * scale, 0, 10 * scale);
+      floatGrad.addColorStop(0, '#fb923c');
+      floatGrad.addColorStop(1, '#ea580c');
+      ctx.fillStyle = floatGrad;
       ctx.beginPath();
-      ctx.arc(0, 2, 8 * scale, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.fillStyle = '#e0f2fe';
-      ctx.beginPath();
-      ctx.arc(0, 2, 4 * scale, 0, Math.PI * 2);
+      ctx.ellipse(0, 4 * scale, 20 * scale, 8 * scale, 0, 0, Math.PI * 2);
       ctx.fill();
 
-      ctx.strokeStyle = '#0f172a';
-      ctx.lineWidth = 2;
+      // mast
+      ctx.strokeStyle = '#1f2937';
+      ctx.lineWidth = 2 * scale;
       ctx.beginPath();
-      ctx.moveTo(0, -18 * scale);
-      ctx.lineTo(0, 2);
+      ctx.moveTo(0, -20 * scale);
+      ctx.lineTo(0, 2 * scale);
       ctx.stroke();
 
-      ctx.fillStyle = '#1d4ed8';
+      // flag
+      const flagGrad = ctx.createLinearGradient(0, -20 * scale, 16 * scale, -12 * scale);
+      flagGrad.addColorStop(0, '#2563eb');
+      flagGrad.addColorStop(1, '#1d4ed8');
+      ctx.fillStyle = flagGrad;
       ctx.beginPath();
-      ctx.moveTo(0, -18 * scale);
-      ctx.lineTo(14 * scale, -14 * scale);
-      ctx.lineTo(0, -10 * scale);
+      ctx.moveTo(0, -20 * scale);
+      ctx.lineTo(16 * scale, -16 * scale);
+      ctx.lineTo(0, -12 * scale);
       ctx.closePath();
       ctx.fill();
+
+      // reflective target marker
+      ctx.fillStyle = '#e2e8f0';
+      ctx.beginPath();
+      ctx.arc(0, -2 * scale, 6 * scale, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#0ea5e9';
+      ctx.beginPath();
+      ctx.arc(0, -2 * scale, 3 * scale, 0, Math.PI * 2);
+      ctx.fill();
+
+      // trim
+      ctx.strokeStyle = '#7c2d12';
+      ctx.lineWidth = 1.3 * scale;
+      ctx.beginPath();
+      ctx.ellipse(0, 4 * scale, 20 * scale, 8 * scale, 0, 0, Math.PI * 2);
+      ctx.stroke();
       ctx.restore();
     }
 
     function drawScene() {
       const q = state.currentQuestion;
+      const adjLabel = q.unknown === 'adjacent' ? '? m' : `${q.adjacent} m`;
+      const oppLabel = q.unknown === 'opposite' ? '? m' : `${q.opposite} m`;
+      const hypLabel = q.unknown === 'hypotenuse' ? '? m' : `${q.hypotenuse} m`;
+      const angleLabel = q.unknown === 'angle' ? '?°' : `${q.theta}°`;
+      const adjColor = q.unknown === 'adjacent' ? '#dc2626' : '#1d4ed8';
+      const oppColor = q.unknown === 'opposite' ? '#dc2626' : '#1d4ed8';
+      const hypColor = q.unknown === 'hypotenuse' ? '#dc2626' : '#1d4ed8';
+      const angleColor = q.unknown === 'angle' ? '#dc2626' : '#1d4ed8';
+
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       ctx.lineWidth = 4;
       ctx.strokeStyle = '#0f172a';
@@ -585,17 +621,12 @@
         ctx.stroke();
 
         drawArc(observer.x, observer.y, -0.45, 0, 28);
-        drawTextWithHalo('θ', observer.x + 18, observer.y - 20, '#0f172a');
-
-        ctx.fillStyle = '#1d4ed8';
-        if (q.type !== 'B') ctx.fillText(`d = ${q.d}m`, (observer.x + rightX) / 2 - 35, observer.y + 24);
-        if (q.type !== 'A') ctx.fillText(`h = ${q.h}m`, rightX + 12, (groundY + top.y) / 2);
-        if (q.type !== 'C') drawTextWithHalo(`${q.theta}°`, observer.x + 44, observer.y - 34, '#1d4ed8');
-
-        ctx.fillStyle = '#dc2626';
-        if (q.type === 'A') ctx.fillText('h = ?', rightX + 10, (groundY + top.y) / 2);
-        if (q.type === 'B') ctx.fillText('d = ?', (observer.x + rightX) / 2 - 35, observer.y + 24);
-        if (q.type === 'C') drawTextWithHalo('θ = ?', observer.x + 46, observer.y - 34, '#dc2626');
+        ctx.fillStyle = adjColor;
+        ctx.fillText(adjLabel, (observer.x + rightX) / 2 - 30, observer.y + 24);
+        ctx.fillStyle = oppColor;
+        ctx.fillText(oppLabel, rightX + 12, (groundY + top.y) / 2);
+        drawTextWithHalo(angleLabel, observer.x + 42, observer.y - 34, angleColor);
+        drawTextWithHalo(hypLabel, (observer.x + top.x) / 2 - 24, (observer.y + top.y) / 2 - 8, hypColor);
       } else {
         const observer = { x: leftX, y: 95 };
         const target = { x: rightX, y: groundY };
@@ -629,19 +660,15 @@
         drawTargetSprite(target.x, target.y, 1);
 
         drawArc(observer.x, observer.y, 0, 0.45, 28);
-        drawTextWithHalo('θ', observer.x + 16, observer.y + 34, '#0f172a');
 
         drawArc(target.x, target.y, -Math.PI + 0.12, -Math.PI + 0.55, 22);
 
-        ctx.fillStyle = '#1d4ed8';
-        if (q.type !== 'B') ctx.fillText(`d = ${q.d}m`, (observer.x + target.x) / 2 - 30, groundY + 24);
-        if (q.type !== 'A') ctx.fillText(`h = ${q.h}m`, observer.x - 62, (observer.y + groundY) / 2);
-        if (q.type !== 'C') drawTextWithHalo(`${q.theta}°`, observer.x + 44, observer.y + 40, '#1d4ed8');
-
-        ctx.fillStyle = '#dc2626';
-        if (q.type === 'A') ctx.fillText('h = ?', observer.x - 62, (observer.y + groundY) / 2);
-        if (q.type === 'B') ctx.fillText('d = ?', (observer.x + target.x) / 2 - 30, groundY + 24);
-        if (q.type === 'C') drawTextWithHalo('θ = ?', observer.x + 44, observer.y + 40, '#dc2626');
+        ctx.fillStyle = adjColor;
+        ctx.fillText(adjLabel, (observer.x + target.x) / 2 - 30, groundY + 24);
+        ctx.fillStyle = oppColor;
+        ctx.fillText(oppLabel, observer.x - 62, (observer.y + groundY) / 2);
+        drawTextWithHalo(angleLabel, observer.x + 44, observer.y + 40, angleColor);
+        drawTextWithHalo(hypLabel, (observer.x + target.x) / 2 - 20, (observer.y + target.y) / 2 + 8, hypColor);
       }
     }
 
@@ -652,31 +679,22 @@
       tryAgainBtn.style.display = 'none';
       depressionNote.style.display = 'none';
       answerInput.value = '';
-      equationInput.value = '';
-      ratioButtons.querySelectorAll('.ratio-btn').forEach((btn) => btn.classList.remove('active'));
-
-      ratioButtons.style.display = state.level === 4 ? 'flex' : 'none';
-      equationInput.style.display = state.level === 2 ? 'block' : 'none';
     }
 
     function render() {
-      const q = state.currentQuestion;
       updateBadges();
-      knownValues.innerHTML = knownValuesHtml(q);
-      scaffoldArea.innerHTML = scaffoldHtml(q);
-      scaffoldArea.style.display = scaffoldArea.innerHTML ? 'block' : 'none';
       drawScene();
       resetRoundUI();
     }
 
     function showFeedback(correct, extraMessage = '') {
       const q = state.currentQuestion;
-      const answerText = q.type === 'C' ? `${q.answer.toFixed(1)}°` : `${q.answer} m`;
+      const answerText = q.unknown === 'angle' ? `${q.answer.toFixed(1)}°` : `${q.answer} m`;
       feedback.style.display = 'block';
 
       if (correct) {
         feedback.innerHTML = `<div class="success">✔ Well done!</div>
-          <div>Your answer is correct. We use tan because opposite and adjacent are connected in this triangle.</div>
+          <div>Your answer is correct.</div>
           <div><strong>Answer:</strong> ${answerText}${extraMessage ? `<br>${extraMessage}` : ''}</div>`;
         nextBtn.style.display = 'inline-block';
         tryAgainBtn.style.display = 'none';
@@ -696,7 +714,7 @@
     }
 
     function isAnswerCorrect(userAnswer, expected, type) {
-      if (type === 'C') {
+      if (type === 'ANGLE_FROM_SIDES') {
         return Math.abs(userAnswer - expected) <= 0.2;
       }
       return Math.abs(userAnswer - expected) <= 0.5;
@@ -711,21 +729,7 @@
         return;
       }
 
-      if (state.level === 4 && !state.ratioSelected) {
-        feedback.style.display = 'block';
-        feedback.innerHTML = '<div class="error">Please choose a ratio first (sin, cos, or tan).</div>';
-        return;
-      }
-
-      if (state.level === 2 && !equationInput.value.trim()) {
-        feedback.style.display = 'block';
-        feedback.innerHTML = '<div class="error">Please write your equation in Guided mode.</div>';
-        return;
-      }
-
-      const ratioCorrect = state.level !== 4 || state.ratioSelected === 'tan';
-      const answerCorrect = isAnswerCorrect(value, q.answer, q.type);
-      const correct = ratioCorrect && answerCorrect;
+      const correct = isAnswerCorrect(value, q.answer, q.type);
 
       if (q.attempts === 0) {
         state.questionsAnswered += 1;
@@ -738,29 +742,13 @@
       if (correct) {
         state.points += q.attempts === 1 ? 10 : 5;
         state.currentStreak += 1;
-        state.levelStreak += 1;
-        let levelMessage = '';
-        if (state.levelStreak >= 2 && state.level < 4) {
-          state.level += 1;
-          state.levelStreak = 0;
-          levelMessage = `<span class="success">You advanced to Level ${state.level}!</span>`;
-        }
-        showFeedback(true, levelMessage);
+        showFeedback(true);
       } else {
         state.points = Math.max(0, state.points - 2);
         state.currentStreak = 0;
-        state.levelStreak = 0;
         showFeedback(false);
       }
     }
-
-    ratioButtons.addEventListener('click', (event) => {
-      const btn = event.target.closest('.ratio-btn');
-      if (!btn) return;
-      state.ratioSelected = btn.dataset.ratio;
-      ratioButtons.querySelectorAll('.ratio-btn').forEach((b) => b.classList.remove('active'));
-      btn.classList.add('active');
-    });
 
     checkBtn.addEventListener('click', handleCheck);
 
