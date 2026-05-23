@@ -178,6 +178,16 @@
     [data-role="hint"] {
       display: none !important;
     }
+
+    #questionTypeBadge,
+    #sceneTypeBadge,
+    #ratioBadge {
+      display: none !important;
+    }
+
+    .badge-row {
+      display: none;
+    }
   </style>
 </head>
 <body>
@@ -216,6 +226,7 @@
     </div>
   </div>
 
+  <script src="./sprite-map.js"></script>
   <script>
     const canvas = document.getElementById('sceneCanvas');
     const ctx = canvas.getContext('2d');
@@ -234,19 +245,22 @@
     const nextBtn = document.getElementById('nextBtn');
     const tryAgainBtn = document.getElementById('tryAgainBtn');
     const depressionNote = document.getElementById('depressionNote');
+    const spriteMap = window.SPRITE_MAP || {
+      imageSrc: './ChatGPT Image May 23, 2026, 12_00_55 PM.png',
+      sheet: { cellW: 256, cellH: 256 },
+      sprites: {
+        surveyor: { col: 1, row: 2, width: 58, height: 58, xOffset: 2, yOffset: 2 },
+        target: { col: 3, row: 3, width: 64, height: 64, xOffset: 0, yOffset: 8 }
+      }
+    };
     const spriteSheet = new Image();
     const spriteMeta = {
       loaded: false,
       failed: false,
-      cellW: 256,
-      cellH: 256,
-      originCol: 1,
-      originRow: 0
+      cellW: spriteMap.sheet.cellW,
+      cellH: spriteMap.sheet.cellH
     };
-    const spriteFrames = {
-      surveyor: { col: 0, row: 2 },
-      target: { col: 2, row: 3 }
-    };
+    const spriteFrames = spriteMap.sprites;
 
     spriteSheet.onload = () => {
       spriteMeta.loaded = true;
@@ -257,7 +271,7 @@
     spriteSheet.onerror = () => {
       spriteMeta.failed = true;
     };
-    spriteSheet.src = './ChatGPT Image May 23, 2026, 12_00_55 PM.png';
+    spriteSheet.src = spriteMap.imageSrc;
 
     const questionTypes = [
       'HEIGHT_FROM_ADJ_ANGLE',
@@ -583,8 +597,8 @@
         return false;
       }
 
-      const sx = (spriteMeta.originCol + frame.col) * spriteMeta.cellW;
-      const sy = (spriteMeta.originRow + frame.row) * spriteMeta.cellH;
+      const sx = frame.col * spriteMeta.cellW;
+      const sy = frame.row * spriteMeta.cellH;
 
       ctx.save();
       if (facing === 'left') {
@@ -599,12 +613,15 @@
     }
 
     function drawSurveyor(footX, footY, scale = 1, facing = 'right') {
+      const frame = spriteFrames.surveyor;
+      const xOffset = (frame.xOffset || 0) * (facing === 'left' ? -1 : 1);
+      const yOffset = frame.yOffset || 0;
       const drawn = drawSpriteFromSheet(
-        spriteFrames.surveyor,
-        footX + (facing === 'left' ? -2 : 2),
-        footY + 2 * scale,
-        58 * scale,
-        58 * scale,
+        frame,
+        footX + xOffset * scale,
+        footY + yOffset * scale,
+        frame.width * scale,
+        frame.height * scale,
         facing
       );
 
@@ -614,7 +631,14 @@
     }
 
     function drawTarget(x, y, scale = 1) {
-      const drawn = drawSpriteFromSheet(spriteFrames.target, x, y + 8 * scale, 64 * scale, 64 * scale);
+      const frame = spriteFrames.target;
+      const drawn = drawSpriteFromSheet(
+        frame,
+        x + (frame.xOffset || 0) * scale,
+        y + (frame.yOffset || 0) * scale,
+        frame.width * scale,
+        frame.height * scale
+      );
       if (!drawn) {
         drawTargetSprite(x, y, scale);
       }
