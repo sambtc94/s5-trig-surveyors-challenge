@@ -234,6 +234,30 @@
     const nextBtn = document.getElementById('nextBtn');
     const tryAgainBtn = document.getElementById('tryAgainBtn');
     const depressionNote = document.getElementById('depressionNote');
+    const spriteSheet = new Image();
+    const spriteMeta = {
+      loaded: false,
+      failed: false,
+      cellW: 256,
+      cellH: 256,
+      originCol: 1,
+      originRow: 0
+    };
+    const spriteFrames = {
+      surveyor: { col: 0, row: 2 },
+      target: { col: 2, row: 3 }
+    };
+
+    spriteSheet.onload = () => {
+      spriteMeta.loaded = true;
+      if (state.currentQuestion) {
+        drawScene();
+      }
+    };
+    spriteSheet.onerror = () => {
+      spriteMeta.failed = true;
+    };
+    spriteSheet.src = './ChatGPT Image May 23, 2026, 12_00_55 PM.png';
 
     const questionTypes = [
       'HEIGHT_FROM_ADJ_ANGLE',
@@ -554,6 +578,48 @@
       ctx.restore();
     }
 
+    function drawSpriteFromSheet(frame, centerX, baseY, width, height, facing = 'right') {
+      if (!spriteMeta.loaded || spriteMeta.failed) {
+        return false;
+      }
+
+      const sx = (spriteMeta.originCol + frame.col) * spriteMeta.cellW;
+      const sy = (spriteMeta.originRow + frame.row) * spriteMeta.cellH;
+
+      ctx.save();
+      if (facing === 'left') {
+        ctx.translate(centerX, 0);
+        ctx.scale(-1, 1);
+        ctx.drawImage(spriteSheet, sx, sy, spriteMeta.cellW, spriteMeta.cellH, -width / 2, baseY - height, width, height);
+      } else {
+        ctx.drawImage(spriteSheet, sx, sy, spriteMeta.cellW, spriteMeta.cellH, centerX - width / 2, baseY - height, width, height);
+      }
+      ctx.restore();
+      return true;
+    }
+
+    function drawSurveyor(footX, footY, scale = 1, facing = 'right') {
+      const drawn = drawSpriteFromSheet(
+        spriteFrames.surveyor,
+        footX + (facing === 'left' ? -2 : 2),
+        footY + 2 * scale,
+        58 * scale,
+        58 * scale,
+        facing
+      );
+
+      if (!drawn) {
+        drawSurveyorSprite(footX, footY, scale, facing);
+      }
+    }
+
+    function drawTarget(x, y, scale = 1) {
+      const drawn = drawSpriteFromSheet(spriteFrames.target, x, y + 8 * scale, 64 * scale, 64 * scale);
+      if (!drawn) {
+        drawTargetSprite(x, y, scale);
+      }
+    }
+
     function drawScene() {
       const q = state.currentQuestion;
       const adjLabel = q.unknown === 'adjacent' ? '? m' : `${q.adjacent} m`;
@@ -593,7 +659,7 @@
         const observer = { x: leftX, y: groundY };
         const top = { x: rightX, y: 110 };
 
-        drawSurveyorSprite(observer.x - 2, observer.y + 2, 1, 'right');
+        drawSurveyor(observer.x - 2, observer.y + 2, 1, 'right');
 
         ctx.setLineDash([8, 8]);
         ctx.beginPath();
@@ -641,7 +707,7 @@
         ctx.fillStyle = '#cbd5e1';
         ctx.fill();
 
-        drawSurveyorSprite(observer.x, buildingTopY, 0.95, 'right');
+        drawSurveyor(observer.x, buildingTopY, 0.95, 'right');
 
         ctx.strokeStyle = '#0f172a';
         ctx.beginPath();
@@ -657,7 +723,7 @@
         ctx.stroke();
         ctx.setLineDash([]);
 
-        drawTargetSprite(target.x, target.y, 1);
+        drawTarget(target.x, target.y, 1);
 
         drawArc(observer.x, observer.y, 0, 0.45, 28);
 
