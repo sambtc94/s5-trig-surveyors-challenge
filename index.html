@@ -35,9 +35,13 @@
 
     h1 {
       text-align: center;
-      margin: 0 0 14px;
+      margin: 0 0 10px;
       color: #0f3e67;
       letter-spacing: 0.2px;
+    }
+
+    .top-header {
+      margin-bottom: 12px;
     }
 
     .question-prompt {
@@ -74,6 +78,21 @@
       padding: 6px 10px;
       font-weight: 700;
       font-size: 0.9rem;
+    }
+
+    .stats-row {
+      justify-content: center;
+      margin: 0 0 12px;
+      padding: 10px;
+      border-radius: 12px;
+      border: 1px solid #bfdbfe;
+      background: linear-gradient(180deg, #eff6ff 0%, #dbeafe 100%);
+    }
+
+    .stats-row .badge {
+      background: #ffffff;
+      border: 1px solid #bfdbfe;
+      color: #1e3a8a;
     }
 
     .progress-wrap {
@@ -192,7 +211,16 @@
 </head>
 <body>
   <div class="container">
-    <h1>Surveyor's Challenge</h1>
+    <div class="top-header">
+      <h1>Surveyor's Challenge</h1>
+      <div class="stats-row">
+        <span class="badge" id="questionsBadge"></span>
+        <span class="badge" id="firstTryBadge"></span>
+        <span class="badge" id="streakBadge"></span>
+        <span class="badge" id="pointsBadge"></span>
+      </div>
+    </div>
+
     <div id="questionPrompt" class="question-prompt"></div>
     <canvas id="sceneCanvas" width="600" height="350"></canvas>
 
@@ -200,13 +228,6 @@
       <span id="questionTypeBadge" class="badge"></span>
       <span id="sceneTypeBadge" class="badge"></span>
       <span id="ratioBadge" class="badge"></span>
-    </div>
-
-    <div class="stats-row">
-      <span class="badge" id="questionsBadge"></span>
-      <span class="badge" id="firstTryBadge"></span>
-      <span class="badge" id="streakBadge"></span>
-      <span class="badge" id="pointsBadge"></span>
     </div>
 
     <div class="controls">
