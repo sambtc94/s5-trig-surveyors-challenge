@@ -207,6 +207,46 @@
     .badge-row {
       display: none;
     }
+
+    /* Draw-and-label section */
+    #drawLabelSection {
+      display: none;
+      margin-bottom: 10px;
+    }
+
+    .draw-instruction {
+      text-align: center;
+      font-weight: 600;
+      color: #0f3e67;
+      margin-bottom: 10px;
+      padding: 8px;
+      background: #eff6ff;
+      border-radius: 8px;
+      border: 1px solid #bfdbfe;
+    }
+
+    .label-inputs {
+      display: grid;
+      gap: 8px;
+      margin-bottom: 10px;
+    }
+
+    .label-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .label-row label {
+      min-width: 240px;
+      font-weight: 600;
+      color: var(--ink);
+      font-size: 0.95rem;
+    }
+
+    .label-row input {
+      flex: 1;
+    }
   </style>
 </head>
 <body>
@@ -230,6 +270,28 @@
       <span id="ratioBadge" class="badge"></span>
     </div>
 
+    <div id="drawLabelSection">
+      <div class="draw-instruction" id="drawInstruction">Click to place 3 corners of your right-angle triangle on the canvas above</div>
+      <div class="label-inputs">
+        <div class="label-row">
+          <label>Angle (θ) at surveyor:</label>
+          <input type="text" id="labelAngle" placeholder="e.g. 53.1 (or ? if unknown)" />
+        </div>
+        <div class="label-row">
+          <label>Vertical height (opposite side):</label>
+          <input type="text" id="labelOpp" placeholder="value in m (or ? if unknown)" />
+        </div>
+        <div class="label-row">
+          <label>Horizontal distance (adjacent side):</label>
+          <input type="text" id="labelAdj" placeholder="value in m (or ? if unknown)" />
+        </div>
+        <div class="label-row">
+          <label>Line-of-sight (hypotenuse):</label>
+          <input type="text" id="labelHyp" placeholder="value in m (or ? if unknown)" />
+        </div>
+      </div>
+    </div>
+
     <div class="controls">
       <input id="answerInput" type="number" step="0.1" placeholder="Type your answer" />
       <button id="checkBtn" type="button">Check Answer</button>
@@ -247,7 +309,6 @@
     </div>
   </div>
 
-  <script src="./sprite-map.js"></script>
   <script>
     const canvas = document.getElementById('sceneCanvas');
     const ctx = canvas.getContext('2d');
@@ -266,34 +327,6 @@
     const nextBtn = document.getElementById('nextBtn');
     const tryAgainBtn = document.getElementById('tryAgainBtn');
     const depressionNote = document.getElementById('depressionNote');
-    const spriteMap = window.SPRITE_MAP || {
-      imageSrc: './ChatGPT Image May 23, 2026, 12_00_55 PM.png',
-      sheet: { cellW: 256, cellH: 256 },
-      sprites: {
-        surveyor: { col: 1, row: 2, width: 58, height: 58, xOffset: 2, yOffset: 2 },
-        target: { col: 3, row: 3, width: 64, height: 64, xOffset: 0, yOffset: 8 }
-      }
-    };
-    const spriteSheet = new Image();
-    const spriteMeta = {
-      loaded: false,
-      failed: false,
-      cellW: spriteMap.sheet.cellW,
-      cellH: spriteMap.sheet.cellH
-    };
-    const spriteFrames = spriteMap.sprites;
-
-    spriteSheet.onload = () => {
-      spriteMeta.loaded = true;
-      if (state.currentQuestion) {
-        drawScene();
-      }
-    };
-    spriteSheet.onerror = () => {
-      spriteMeta.failed = true;
-    };
-    spriteSheet.src = spriteMap.imageSrc;
-
     const questionTypes = [
       'HEIGHT_FROM_ADJ_ANGLE',
       'DIST_FROM_OPP_ANGLE',
@@ -301,7 +334,8 @@
       'HYP_FROM_OPP_ANGLE',
       'HYP_FROM_ADJ_ANGLE',
       'HEIGHT_FROM_HYP_ANGLE',
-      'DIST_FROM_HYP_ANGLE'
+      'DIST_FROM_HYP_ANGLE',
+      'DRAW_AND_LABEL'
     ];
 
     const triples = [
@@ -338,6 +372,12 @@
     function createQuestion() {
       const sceneType = Math.random() < 0.5 ? 'ELEVATION' : 'DEPRESSION';
       const type = nextQuestionType();
+
+      // For DRAW_AND_LABEL, choose a random underlying math type
+      const underlyingTypes = questionTypes.filter(t => t !== 'DRAW_AND_LABEL');
+      const isDrawAndLabel = type === 'DRAW_AND_LABEL';
+      const mathType = isDrawAndLabel ? underlyingTypes[randInt(0, underlyingTypes.length - 1)] : type;
+
       const [a, b, c] = triples[randInt(0, triples.length - 1)];
       const scale = randInt(4, 10);
       const swapLegs = Math.random() < 0.5;
@@ -352,7 +392,7 @@
       let solveText = '';
       let prompt = '';
 
-      if (type === 'HEIGHT_FROM_ADJ_ANGLE') {
+      if (mathType === 'HEIGHT_FROM_ADJ_ANGLE') {
         answer = opposite;
         unknown = 'opposite';
         ratio = 'tan';
@@ -360,7 +400,7 @@
         prompt = sceneType === 'ELEVATION'
           ? `A surveyor is ${adjacent} m from a tower and measures an angle of elevation of ${theta}°. Find the tower height.`
           : `From a lookout point, a surveyor measures an angle of depression of ${theta}° to a target. The horizontal distance is ${adjacent} m. Find the vertical drop.`;
-      } else if (type === 'DIST_FROM_OPP_ANGLE') {
+      } else if (mathType === 'DIST_FROM_OPP_ANGLE') {
         answer = adjacent;
         unknown = 'adjacent';
         ratio = 'tan';
@@ -368,7 +408,7 @@
         prompt = sceneType === 'ELEVATION'
           ? `A surveyor measures an angle of elevation of ${theta}° to the top of a structure. The structure is ${opposite} m high. How far is the surveyor from the base?`
           : `A lookout station is ${opposite} m above sea level. A boat is seen at an angle of depression of ${theta}°. How far is the boat horizontally from the station?`;
-      } else if (type === 'ANGLE_FROM_SIDES') {
+      } else if (mathType === 'ANGLE_FROM_SIDES') {
         answer = theta;
         unknown = 'angle';
         ratio = 'tan';
@@ -376,7 +416,7 @@
         prompt = sceneType === 'ELEVATION'
           ? `A surveyor is ${adjacent} m from a building and the top is ${opposite} m above eye level. Find the angle of elevation.`
           : `From a cliff lookout, the target is ${adjacent} m away horizontally and ${opposite} m below. Find the angle of depression.`;
-      } else if (type === 'HYP_FROM_OPP_ANGLE') {
+      } else if (mathType === 'HYP_FROM_OPP_ANGLE') {
         answer = hypotenuse;
         unknown = 'hypotenuse';
         ratio = 'sin';
@@ -384,7 +424,7 @@
         prompt = sceneType === 'ELEVATION'
           ? `A surveyor measures an angle of elevation of ${theta}° and knows the height difference is ${opposite} m. Find the line-of-sight distance.`
           : `A lookout measures an angle of depression of ${theta}° to a point ${opposite} m below. Find the line-of-sight distance.`;
-      } else if (type === 'HYP_FROM_ADJ_ANGLE') {
+      } else if (mathType === 'HYP_FROM_ADJ_ANGLE') {
         answer = hypotenuse;
         unknown = 'hypotenuse';
         ratio = 'cos';
@@ -392,7 +432,7 @@
         prompt = sceneType === 'ELEVATION'
           ? `A surveyor stands ${adjacent} m from a tower and measures an angle of elevation of ${theta}°. Find the line-of-sight distance to the top.`
           : `A lookout sees a target at an angle of depression of ${theta}° with a horizontal distance of ${adjacent} m. Find the line-of-sight distance.`;
-      } else if (type === 'HEIGHT_FROM_HYP_ANGLE') {
+      } else if (mathType === 'HEIGHT_FROM_HYP_ANGLE') {
         answer = opposite;
         unknown = 'opposite';
         ratio = 'sin';
@@ -410,6 +450,11 @@
           : `A lookout has a line-of-sight distance of ${hypotenuse} m to a target at an angle of depression of ${theta}°. Find the horizontal distance.`;
       }
 
+      // Reset drawing state for new question
+      drawState.points = [];
+      drawState.rightAngleIdx = -1;
+      drawState.phase = 'placing';
+
       state.currentQuestion = {
         sceneType,
         adjacent,
@@ -417,6 +462,7 @@
         hypotenuse,
         theta,
         type,
+        mathType,
         ratio,
         unknown,
         solveText,
@@ -427,6 +473,7 @@
     }
 
     function getTypeLabel(type) {
+      if (type === 'DRAW_AND_LABEL') return 'Draw & Label';
       if (type === 'HEIGHT_FROM_ADJ_ANGLE' || type === 'HEIGHT_FROM_HYP_ANGLE') return 'Find Height';
       if (type === 'DIST_FROM_OPP_ANGLE' || type === 'DIST_FROM_HYP_ANGLE') return 'Find Distance';
       if (type === 'ANGLE_FROM_SIDES') return 'Find Angle';
@@ -444,6 +491,9 @@
     }
 
     function getQuestionPrompt(q) {
+      if (q.type === 'DRAW_AND_LABEL') {
+        return `📐 Draw a diagram: ${q.prompt}`;
+      }
       return q.prompt;
     }
 
@@ -613,68 +663,33 @@
       ctx.restore();
     }
 
-    function drawSpriteFromSheet(frame, centerX, baseY, width, height, facing = 'right') {
-      if (!spriteMeta.loaded || spriteMeta.failed) {
-        return false;
-      }
+    // Draw canvas state for DRAW_AND_LABEL questions
+    const drawState = {
+      points: [],
+      rightAngleIdx: -1,
+      phase: 'placing' // 'placing' | 'marking' | 'done'
+    };
 
-      const sx = frame.col * spriteMeta.cellW;
-      const sy = frame.row * spriteMeta.cellH;
-
-      ctx.save();
-      if (facing === 'left') {
-        ctx.translate(centerX, 0);
-        ctx.scale(-1, 1);
-        ctx.drawImage(spriteSheet, sx, sy, spriteMeta.cellW, spriteMeta.cellH, -width / 2, baseY - height, width, height);
-      } else {
-        ctx.drawImage(spriteSheet, sx, sy, spriteMeta.cellW, spriteMeta.cellH, centerX - width / 2, baseY - height, width, height);
-      }
-      ctx.restore();
-      return true;
-    }
-
-    function drawSurveyor(footX, footY, scale = 1, facing = 'right') {
-      const frame = spriteFrames.surveyor;
-      const xOffset = (frame.xOffset || 0) * (facing === 'left' ? -1 : 1);
-      const yOffset = frame.yOffset || 0;
-      const drawn = drawSpriteFromSheet(
-        frame,
-        footX + xOffset * scale,
-        footY + yOffset * scale,
-        frame.width * scale,
-        frame.height * scale,
-        facing
-      );
-
-      if (!drawn) {
-        drawSurveyorSprite(footX, footY, scale, facing);
-      }
-    }
-
-    function drawTarget(x, y, scale = 1) {
-      const frame = spriteFrames.target;
-      const drawn = drawSpriteFromSheet(
-        frame,
-        x + (frame.xOffset || 0) * scale,
-        y + (frame.yOffset || 0) * scale,
-        frame.width * scale,
-        frame.height * scale
-      );
-      if (!drawn) {
-        drawTargetSprite(x, y, scale);
-      }
+    // Which labels to show for each question type (only the given/known values)
+    function getShownLabels(q) {
+      const t = q.mathType || q.type;
+      return {
+        angle: t !== 'ANGLE_FROM_SIDES',
+        adj: t === 'HEIGHT_FROM_ADJ_ANGLE' || t === 'HYP_FROM_ADJ_ANGLE' || t === 'ANGLE_FROM_SIDES',
+        opp: t === 'DIST_FROM_OPP_ANGLE' || t === 'HYP_FROM_OPP_ANGLE' || t === 'ANGLE_FROM_SIDES',
+        hyp: t === 'HEIGHT_FROM_HYP_ANGLE' || t === 'DIST_FROM_HYP_ANGLE'
+      };
     }
 
     function drawScene() {
       const q = state.currentQuestion;
-      const adjLabel = q.unknown === 'adjacent' ? '? m' : `${q.adjacent} m`;
-      const oppLabel = q.unknown === 'opposite' ? '? m' : `${q.opposite} m`;
-      const hypLabel = q.unknown === 'hypotenuse' ? '? m' : `${q.hypotenuse} m`;
-      const angleLabel = q.unknown === 'angle' ? '?°' : `${q.theta}°`;
-      const adjColor = q.unknown === 'adjacent' ? '#dc2626' : '#1d4ed8';
-      const oppColor = q.unknown === 'opposite' ? '#dc2626' : '#1d4ed8';
-      const hypColor = q.unknown === 'hypotenuse' ? '#dc2626' : '#1d4ed8';
-      const angleColor = q.unknown === 'angle' ? '#dc2626' : '#1d4ed8';
+
+      if (q.type === 'DRAW_AND_LABEL') {
+        drawDrawingCanvas();
+        return;
+      }
+
+      const shown = getShownLabels(q);
 
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       ctx.lineWidth = 4;
@@ -704,7 +719,7 @@
         const observer = { x: leftX, y: groundY };
         const top = { x: rightX, y: 110 };
 
-        drawSurveyor(observer.x - 2, observer.y + 2, 1, 'right');
+        drawSurveyorSprite(observer.x - 2, observer.y + 2, 1, 'right');
 
         ctx.setLineDash([8, 8]);
         ctx.beginPath();
@@ -732,12 +747,20 @@
         ctx.stroke();
 
         drawArc(observer.x, observer.y, -0.45, 0, 28);
-        ctx.fillStyle = adjColor;
-        ctx.fillText(adjLabel, (observer.x + rightX) / 2 - 30, observer.y + 24);
-        ctx.fillStyle = oppColor;
-        ctx.fillText(oppLabel, rightX + 12, (groundY + top.y) / 2);
-        drawTextWithHalo(angleLabel, observer.x + 42, observer.y - 34, angleColor);
-        drawTextWithHalo(hypLabel, (observer.x + top.x) / 2 - 24, (observer.y + top.y) / 2 - 8, hypColor);
+        if (shown.adj) {
+          ctx.fillStyle = '#1d4ed8';
+          ctx.fillText(`${q.adjacent} m`, (observer.x + rightX) / 2 - 30, observer.y + 24);
+        }
+        if (shown.opp) {
+          ctx.fillStyle = '#1d4ed8';
+          ctx.fillText(`${q.opposite} m`, rightX + 12, (groundY + top.y) / 2);
+        }
+        if (shown.angle) {
+          drawTextWithHalo(`${q.theta}°`, observer.x + 42, observer.y - 34, '#1d4ed8');
+        }
+        if (shown.hyp) {
+          drawTextWithHalo(`${q.hypotenuse} m`, (observer.x + top.x) / 2 - 24, (observer.y + top.y) / 2 - 8, '#1d4ed8');
+        }
       } else {
         const observer = { x: leftX, y: 95 };
         const target = { x: rightX, y: groundY };
@@ -752,7 +775,7 @@
         ctx.fillStyle = '#cbd5e1';
         ctx.fill();
 
-        drawSurveyor(observer.x, buildingTopY, 0.95, 'right');
+        drawSurveyorSprite(observer.x, buildingTopY, 0.95, 'right');
 
         ctx.strokeStyle = '#0f172a';
         ctx.beginPath();
@@ -768,19 +791,118 @@
         ctx.stroke();
         ctx.setLineDash([]);
 
-        drawTarget(target.x, target.y, 1);
+        drawTargetSprite(target.x, target.y, 1);
 
         drawArc(observer.x, observer.y, 0, 0.45, 28);
-
         drawArc(target.x, target.y, -Math.PI + 0.12, -Math.PI + 0.55, 22);
 
-        ctx.fillStyle = adjColor;
-        ctx.fillText(adjLabel, (observer.x + target.x) / 2 - 30, groundY + 24);
-        ctx.fillStyle = oppColor;
-        ctx.fillText(oppLabel, observer.x - 62, (observer.y + groundY) / 2);
-        drawTextWithHalo(angleLabel, observer.x + 44, observer.y + 40, angleColor);
-        drawTextWithHalo(hypLabel, (observer.x + target.x) / 2 - 20, (observer.y + target.y) / 2 + 8, hypColor);
+        if (shown.adj) {
+          ctx.fillStyle = '#1d4ed8';
+          ctx.fillText(`${q.adjacent} m`, (observer.x + target.x) / 2 - 30, groundY + 24);
+        }
+        if (shown.opp) {
+          ctx.fillStyle = '#1d4ed8';
+          ctx.fillText(`${q.opposite} m`, observer.x - 62, (observer.y + groundY) / 2);
+        }
+        if (shown.angle) {
+          drawTextWithHalo(`${q.theta}°`, observer.x + 44, observer.y + 40, '#1d4ed8');
+        }
+        if (shown.hyp) {
+          drawTextWithHalo(`${q.hypotenuse} m`, (observer.x + target.x) / 2 - 20, (observer.y + target.y) / 2 + 8, '#1d4ed8');
+        }
       }
+    }
+
+    function drawDrawingCanvas() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      // Light grid background
+      ctx.fillStyle = '#f8fafc';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.strokeStyle = '#e2e8f0';
+      ctx.lineWidth = 1;
+      const gridStep = 40;
+      for (let x = 0; x <= canvas.width; x += gridStep) {
+        ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, canvas.height); ctx.stroke();
+      }
+      for (let y = 0; y <= canvas.height; y += gridStep) {
+        ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(canvas.width, y); ctx.stroke();
+      }
+
+      const pts = drawState.points;
+
+      // Draw lines between placed points
+      if (pts.length >= 2) {
+        ctx.strokeStyle = '#1d4ed8';
+        ctx.lineWidth = 3;
+        for (let i = 0; i < pts.length - 1; i++) {
+          ctx.beginPath();
+          ctx.moveTo(pts[i].x, pts[i].y);
+          ctx.lineTo(pts[i + 1].x, pts[i + 1].y);
+          ctx.stroke();
+        }
+        // Close triangle once 3 points
+        if (pts.length === 3) {
+          ctx.beginPath();
+          ctx.moveTo(pts[2].x, pts[2].y);
+          ctx.lineTo(pts[0].x, pts[0].y);
+          ctx.stroke();
+        }
+      }
+
+      // Draw right-angle marker
+      if (drawState.rightAngleIdx >= 0) {
+        const p = pts[drawState.rightAngleIdx];
+        const prev = pts[(drawState.rightAngleIdx + 2) % 3];
+        const next = pts[(drawState.rightAngleIdx + 1) % 3];
+        const size = 18;
+        const vPrev = normalize(prev.x - p.x, prev.y - p.y, size);
+        const vNext = normalize(next.x - p.x, next.y - p.y, size);
+        ctx.strokeStyle = '#0f172a';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(p.x + vPrev.x, p.y + vPrev.y);
+        ctx.lineTo(p.x + vPrev.x + vNext.x, p.y + vPrev.y + vNext.y);
+        ctx.lineTo(p.x + vNext.x, p.y + vNext.y);
+        ctx.stroke();
+      }
+
+      // Draw corner dots
+      pts.forEach((p, i) => {
+        ctx.fillStyle = i === drawState.rightAngleIdx ? '#15803d' : '#2563eb';
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, 7, 0, Math.PI * 2);
+        ctx.fill();
+      });
+
+      // Instruction overlay
+      let instruction = '';
+      if (drawState.phase === 'placing') {
+        instruction = pts.length === 0
+          ? 'Click to place corner 1 (surveyor position)'
+          : pts.length === 1
+            ? 'Click to place corner 2'
+            : 'Click to place corner 3 — close your triangle';
+      } else if (drawState.phase === 'marking') {
+        instruction = 'Click near a corner to mark the right angle (∟)';
+      } else {
+        instruction = '✔ Triangle drawn! Fill in the labels below, then click Check Labels.';
+      }
+
+      ctx.save();
+      ctx.font = 'bold 15px Arial';
+      ctx.fillStyle = 'rgba(255,255,255,0.9)';
+      const tw = ctx.measureText(instruction).width + 20;
+      ctx.fillRect((canvas.width - tw) / 2, 10, tw, 28);
+      ctx.fillStyle = '#0f3e67';
+      ctx.textAlign = 'center';
+      ctx.fillText(instruction, canvas.width / 2, 29);
+      ctx.restore();
+    }
+
+    function normalize(dx, dy, len) {
+      const mag = Math.sqrt(dx * dx + dy * dy) || 1;
+      return { x: (dx / mag) * len, y: (dy / mag) * len };
     }
 
     function resetRoundUI() {
@@ -790,12 +912,114 @@
       tryAgainBtn.style.display = 'none';
       depressionNote.style.display = 'none';
       answerInput.value = '';
+
+      const isDrawAndLabel = state.currentQuestion && state.currentQuestion.type === 'DRAW_AND_LABEL';
+      document.getElementById('drawLabelSection').style.display = isDrawAndLabel ? 'block' : 'none';
+      document.querySelector('.controls').style.display = isDrawAndLabel ? 'none' : 'grid';
+      if (isDrawAndLabel) {
+        document.getElementById('labelAngle').value = '';
+        document.getElementById('labelOpp').value = '';
+        document.getElementById('labelAdj').value = '';
+        document.getElementById('labelHyp').value = '';
+        document.getElementById('drawInstruction').textContent =
+          'Click to place 3 corners of your right-angle triangle on the canvas above';
+      }
     }
 
     function render() {
       updateBadges();
       drawScene();
       resetRoundUI();
+      const isDrawAndLabel = state.currentQuestion && state.currentQuestion.type === 'DRAW_AND_LABEL';
+      checkBtn.textContent = isDrawAndLabel ? 'Check Labels' : 'Check Answer';
+    }
+
+    function workedSolutionDrawAndLabel(q) {
+      const shown = getShownLabels(q);
+      const lines = [`<strong>Correct labels for your diagram:</strong>`];
+      if (shown.angle) lines.push(`θ (angle) = ${q.theta}°`);
+      if (shown.adj) lines.push(`Adjacent (horizontal) = ${q.adjacent} m`);
+      if (shown.opp) lines.push(`Opposite (vertical) = ${q.opposite} m`);
+      if (shown.hyp) lines.push(`Hypotenuse (line-of-sight) = ${q.hypotenuse} m`);
+      lines.push(`Unknown (${q.unknown}) → marked with "?"`);
+      lines.push(`<br>Then solve: ${q.solveText}`);
+      return lines.join('<br>');
+    }
+
+    function checkDrawAndLabel() {
+      const q = state.currentQuestion;
+      const shown = getShownLabels(q);
+
+      function parseField(id) {
+        return document.getElementById(id).value.trim().replace(/[°m\s]/g, '').toLowerCase();
+      }
+
+      const rawAngle = parseField('labelAngle');
+      const rawOpp = parseField('labelOpp');
+      const rawAdj = parseField('labelAdj');
+      const rawHyp = parseField('labelHyp');
+
+      function checkGiven(raw, expected) {
+        const num = parseFloat(raw);
+        return !isNaN(num) && Math.abs(num - expected) <= 0.5;
+      }
+
+      function checkUnknown(raw) {
+        return raw === '?';
+      }
+
+      const errors = [];
+
+      if (shown.angle) {
+        if (!checkGiven(rawAngle, q.theta)) errors.push(`Angle should be ${q.theta}°`);
+      } else {
+        if (!checkUnknown(rawAngle)) errors.push('Unknown angle should be labeled "?"');
+      }
+
+      if (shown.adj) {
+        if (!checkGiven(rawAdj, q.adjacent)) errors.push(`Adjacent side should be ${q.adjacent} m`);
+      } else if (q.unknown === 'adjacent') {
+        if (!checkUnknown(rawAdj)) errors.push('Unknown adjacent side should be labeled "?"');
+      }
+
+      if (shown.opp) {
+        if (!checkGiven(rawOpp, q.opposite)) errors.push(`Opposite side should be ${q.opposite} m`);
+      } else if (q.unknown === 'opposite') {
+        if (!checkUnknown(rawOpp)) errors.push('Unknown opposite side should be labeled "?"');
+      }
+
+      if (shown.hyp) {
+        if (!checkGiven(rawHyp, q.hypotenuse)) errors.push(`Hypotenuse should be ${q.hypotenuse} m`);
+      } else if (q.unknown === 'hypotenuse') {
+        if (!checkUnknown(rawHyp)) errors.push('Unknown hypotenuse should be labeled "?"');
+      }
+
+      const correct = errors.length === 0;
+
+      if (q.attempts === 0) {
+        state.questionsAnswered += 1;
+        if (correct) state.correctFirstAttempt += 1;
+      }
+      q.attempts += 1;
+
+      feedback.style.display = 'block';
+      if (correct) {
+        state.points += q.attempts === 1 ? 10 : 5;
+        state.currentStreak += 1;
+        feedback.innerHTML = `<div class="success">✔ Well done! Your diagram labels are correct.</div>
+          <div>${workedSolutionDrawAndLabel(q)}</div>`;
+        nextBtn.style.display = 'inline-block';
+        tryAgainBtn.style.display = 'none';
+      } else {
+        state.points = Math.max(0, state.points - 2);
+        state.currentStreak = 0;
+        feedback.innerHTML = `<div class="error">✖ Not quite. Check your labels:</div>
+          <div>${errors.map(e => `• ${e}`).join('<br>')}</div>
+          <div style="margin-top:6px;">${workedSolutionDrawAndLabel(q)}</div>`;
+        nextBtn.style.display = 'inline-block';
+        tryAgainBtn.style.display = 'inline-block';
+      }
+      updateBadges();
     }
 
     function showFeedback(correct, extraMessage = '') {
@@ -833,6 +1057,12 @@
 
     function handleCheck() {
       const q = state.currentQuestion;
+
+      if (q.type === 'DRAW_AND_LABEL') {
+        checkDrawAndLabel();
+        return;
+      }
+
       const value = parseFloat(answerInput.value);
 
       if (Number.isNaN(value)) {
@@ -861,13 +1091,47 @@
       }
     }
 
+    // Canvas click handler for DRAW_AND_LABEL drawing interaction
+    canvas.addEventListener('click', (e) => {
+      if (!state.currentQuestion || state.currentQuestion.type !== 'DRAW_AND_LABEL') return;
+      if (drawState.phase === 'done') return;
+
+      const rect = canvas.getBoundingClientRect();
+      const scaleX = canvas.width / rect.width;
+      const scaleY = canvas.height / rect.height;
+      const x = (e.clientX - rect.left) * scaleX;
+      const y = (e.clientY - rect.top) * scaleY;
+
+      if (drawState.phase === 'placing') {
+        drawState.points.push({ x, y });
+        if (drawState.points.length === 3) {
+          drawState.phase = 'marking';
+        }
+      } else if (drawState.phase === 'marking') {
+        let minDist = Infinity;
+        let minIdx = 0;
+        drawState.points.forEach((p, i) => {
+          const d = Math.hypot(p.x - x, p.y - y);
+          if (d < minDist) { minDist = d; minIdx = i; }
+        });
+        drawState.rightAngleIdx = minIdx;
+        drawState.phase = 'done';
+        document.getElementById('drawInstruction').textContent =
+          '✔ Triangle drawn! Fill in the labels below, then click Check Labels.';
+      }
+
+      drawScene();
+    });
+
     checkBtn.addEventListener('click', handleCheck);
 
     tryAgainBtn.addEventListener('click', () => {
       feedback.style.display = 'none';
       tryAgainBtn.style.display = 'none';
       nextBtn.style.display = 'none';
-      answerInput.focus();
+      if (state.currentQuestion && state.currentQuestion.type !== 'DRAW_AND_LABEL') {
+        answerInput.focus();
+      }
     });
 
     nextBtn.addEventListener('click', () => {
